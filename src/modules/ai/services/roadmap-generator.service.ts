@@ -80,7 +80,7 @@ type RoadmapContext = {
 export async function requestValidRoadmap(
   context: RoadmapContext,
   complete: (repairErrors?: string) => Promise<string>,
-): Promise<{ plan: Awaited<ReturnType<typeof parseGeneratedRoadmap>>; source?: string }> {
+): Promise<{ plan: Awaited<ReturnType<typeof parseGeneratedRoadmap>>; source?: 'gemini' | 'mock' }> {
   let lastError = '';
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const text = await complete(attempt === 0 ? undefined : lastError);
