@@ -1,0 +1,13 @@
+import '../modules/users/user.model';
+import '../modules/users/user-preference.model';
+import '../modules/goals/goal.model';
+import '../modules/goals/goal-event.model';
+import '../modules/roadmaps/roadmap.model';
+import '../modules/milestones/milestone.model';
+import '../modules/tasks/task.model';
+import '../modules/tasks/task-progress.model';
+import '../modules/ai/conversation.model';
+import '../modules/notifications/notification.model';
+import '../modules/notifications/device-token.model';
+import '../modules/progress/streak.model';
+import '../modules/assessments/assessment.model';
