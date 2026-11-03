@@ -61,7 +61,9 @@ export const env = {
     .filter(Boolean),
   mockAi: raw.MOCK_AI === 'true',
   aiFallbackToMock: raw.AI_FALLBACK_TO_MOCK === 'true',
-  frontendOrigins: raw.FRONTEND_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean),
+  frontendOrigins: raw.FRONTEND_ORIGIN.split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean),
   aiTimeoutMs: raw.AI_TIMEOUT_MS,
   aiMaxRetries: raw.AI_MAX_RETRIES,
   logLevel: raw.LOG_LEVEL,

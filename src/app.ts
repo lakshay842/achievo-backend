@@ -17,24 +17,51 @@ import { progressRoutes } from './modules/progress/progress.routes';
 import { roadmapRoutes } from './modules/roadmaps/roadmap.routes';
 import { taskRoutes } from './modules/tasks/task.routes';
 import { userRoutes } from './modules/users/user.routes';
-import { ApiError } from './utils/ApiError';
 import { asyncHandler } from './utils/asyncHandler';
 import { logger } from './utils/logger';
+
+function normalizeOrigin(value: string) {
+  return value.trim().replace(/\/+$/, '');
+}
+
+function isAllowedOrigin(origin: string) {
+  const normalized = normalizeOrigin(origin);
+  const allowed = env.frontendOrigins.map(normalizeOrigin);
+  if (allowed.includes(normalized)) {
+    return true;
+  }
+
+  // Allow this project's Vercel production + preview deployments.
+  try {
+    const host = new URL(normalized).hostname;
+    return (
+      host === 'achievo-frontend.vercel.app' ||
+      (host.startsWith('achievo-frontend-') && host.endsWith('.vercel.app'))
+    );
+  } catch {
+    return false;
+  }
+}
 
 export const app = express();
 
 app.set('trust proxy', env.isProduction ? 1 : false);
 app.disable('x-powered-by');
 
-app.use(helmet());
+app.use(
+  helmet({
+    // API responses must be readable by the Vercel/web frontend.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || env.frontendOrigins.includes(origin)) {
+      if (!origin || isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }
-      callback(new ApiError(403, 'Origin not allowed'));
+      callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
