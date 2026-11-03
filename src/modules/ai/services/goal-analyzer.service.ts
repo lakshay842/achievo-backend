@@ -16,7 +16,7 @@ Rules:
 - clarificationQuestions[].id is required (q1, q2, ...).
 - If nothing is missing, return empty arrays for missingInformation and clarificationQuestions.`;
 
-export interface AnalyzeInput {
+export interface AnalyzeInput { 
   goalId?: string;
   title: string;
   description?: string;
