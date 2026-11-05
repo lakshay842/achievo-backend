@@ -2,6 +2,7 @@ import argon2 from 'argon2';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { ApiError } from '../../utils/ApiError';
+import { logger } from '../../utils/logger';
 import { randomToken, sha256 } from '../../utils/tokens';
 import { UserModel, UserDocument } from '../users/user.model';
 import { UserPreferenceModel } from '../users/user-preference.model';
@@ -128,7 +129,13 @@ export async function forgotPassword(email: string) {
     throw new ApiError(503, 'Password reset email is not configured on the server');
   }
 
-  await sendPasswordResetEmail({ to: user.email, resetToken });
+  // Send in the background so Render cold starts + slow Gmail SMTP do not
+  // block the HTTP response past the app's client timeout.
+  void sendPasswordResetEmail({ to: user.email, resetToken }).catch((error) => {
+    // Token is already saved; user can request another email if delivery fails.
+    logger.error({ err: error, email: user.email }, 'Background password reset email failed');
+  });
+
   return { delivered: true as const, emailed: true as const };
 }
 

@@ -20,10 +20,15 @@ function createTransport() {
     host: env.smtpHost,
     port: env.smtpPort,
     secure: env.smtpPort === 465,
+    requireTLS: env.smtpPort === 587,
     auth: {
       user: env.smtpUser,
       pass: env.smtpPass,
     },
+    // Prevent forgot-password HTTP requests from hanging until the mobile client times out.
+    connectionTimeout: 12_000,
+    greetingTimeout: 12_000,
+    socketTimeout: 20_000,
   });
 }
 
