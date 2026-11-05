@@ -37,6 +37,9 @@ function timeoutMsFor(purpose: AiCompletionRequest['purpose']): number {
   if (purpose === 'analyze' || purpose === 'clarify') {
     return Math.max(env.aiTimeoutMs, 30_000);
   }
+  if (purpose === 'chat' || purpose === 'explain') {
+    return Math.max(env.aiTimeoutMs, 60_000);
+  }
   return env.aiTimeoutMs;
 }
 
