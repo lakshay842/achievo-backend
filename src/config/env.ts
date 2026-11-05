@@ -31,6 +31,9 @@ const schema = z
     SMTP_USER: z.string().optional().default(''),
     SMTP_PASS: z.string().optional().default(''),
     SMTP_FROM: z.string().optional().default(''),
+    // HTTPS email API — works on Render free tier (SMTP ports 25/465/587 are blocked there).
+    RESEND_API_KEY: z.string().optional().default(''),
+    RESEND_FROM: z.string().optional().default(''),
     PASSWORD_RESET_URL_BASE: z.string().optional().default(''),
   })
   .superRefine((value, ctx) => {
@@ -81,6 +84,8 @@ export const env = {
   smtpUser: raw.SMTP_USER.trim(),
   smtpPass: raw.SMTP_PASS,
   smtpFrom: raw.SMTP_FROM.trim(),
+  resendApiKey: raw.RESEND_API_KEY.trim(),
+  resendFrom: raw.RESEND_FROM.trim(),
   passwordResetUrlBase: raw.PASSWORD_RESET_URL_BASE.trim(),
   isProduction: raw.NODE_ENV === 'production',
   isTest: raw.NODE_ENV === 'test',

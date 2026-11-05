@@ -9,7 +9,7 @@ import { UserPreferenceModel } from '../users/user-preference.model';
 import { UserStreakModel } from '../progress/streak.model';
 import { toPublicUser } from '../users/user.service';
 import { LoginInput, RegisterInput } from './auth.validation';
-import { isSmtpConfigured, sendPasswordResetEmail } from './mail.service';
+import { isEmailConfigured, sendPasswordResetEmail } from './mail.service';
 
 const RESET_WINDOW_MS = 30 * 60 * 1000;
 
@@ -125,7 +125,7 @@ export async function forgotPassword(email: string) {
     return { delivered: true as const, emailed: false as const, resetToken };
   }
 
-  if (!isSmtpConfigured()) {
+  if (!isEmailConfigured()) {
     throw new ApiError(503, 'Password reset email is not configured on the server');
   }
 

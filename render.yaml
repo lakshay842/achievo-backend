@@ -42,5 +42,11 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      # Required on Render free tier (SMTP ports are blocked). Get a key at https://resend.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        value: Achievo AI <onboarding@resend.dev>
+      # Also set RESEND_API_KEY in the Render dashboard (do not commit the key).
       - key: PASSWORD_RESET_URL_BASE
         value: https://achievo-frontend.vercel.app

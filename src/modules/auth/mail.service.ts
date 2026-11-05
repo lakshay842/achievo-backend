@@ -4,11 +4,16 @@ import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { ApiError } from '../../utils/ApiError';
 
-// Prefer IPv4 — some hosts (incl. Render) have flaky IPv6 to smtp.gmail.com.
+// Prefer IPv4 — some hosts have flaky IPv6 to smtp.gmail.com.
 dns.setDefaultResultOrder('ipv4first');
 
+export function isEmailConfigured(): boolean {
+  return Boolean(env.resendApiKey) || Boolean(env.smtpUser && env.smtpPass);
+}
+
+/** @deprecated use isEmailConfigured */
 export function isSmtpConfigured(): boolean {
-  return Boolean(env.smtpUser && env.smtpPass);
+  return isEmailConfigured();
 }
 
 function resetBaseUrl(): string {
@@ -103,12 +108,61 @@ function buildPasswordResetHtml(resetUrl: string) {
 </html>`;
 }
 
-export async function sendPasswordResetEmail(input: { to: string; resetToken: string }) {
-  if (!isSmtpConfigured()) {
+function buildTextBody(resetUrl: string) {
+  return [
+    'Reset your Achievo password',
+    '',
+    'We received a request to reset the password for your Achievo account.',
+    'Open this link to choose a new password (expires in 30 minutes):',
+    resetUrl,
+    '',
+    'If you did not request this, you can ignore this email.',
+  ].join('\n');
+}
+
+async function sendViaResend(input: { to: string; resetUrl: string }) {
+  const from = env.resendFrom || env.smtpFrom || 'Achievo AI <onboarding@resend.dev>';
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [input.to],
+      subject: 'Reset your Achievo password',
+      text: buildTextBody(input.resetUrl),
+      html: buildPasswordResetHtml(input.resetUrl),
+    }),
+    signal: AbortSignal.timeout(25_000),
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    id?: string;
+    message?: string;
+    name?: string;
+  };
+
+  if (!response.ok) {
+    logger.error(
+      { status: response.status, payload, to: input.to },
+      'Resend password reset email failed',
+    );
+    throw new ApiError(503, 'Unable to send password reset email right now');
+  }
+
+  logger.info(
+    { to: input.to, id: payload.id, provider: 'resend', resetBase: resetBaseUrl() },
+    'Password reset email sent',
+  );
+}
+
+async function sendViaSmtp(input: { to: string; resetUrl: string }) {
+  if (!env.smtpUser || !env.smtpPass) {
     throw new ApiError(503, 'Email delivery is not configured');
   }
 
-  const resetUrl = `${resetBaseUrl()}/forgot-password?token=${encodeURIComponent(input.resetToken)}`;
   const from = env.smtpFrom || env.smtpUser;
   const transport = createTransport();
 
@@ -117,16 +171,8 @@ export async function sendPasswordResetEmail(input: { to: string; resetToken: st
       from,
       to: input.to,
       subject: 'Reset your Achievo password',
-      text: [
-        'Reset your Achievo password',
-        '',
-        'We received a request to reset the password for your Achievo account.',
-        'Open this link to choose a new password (expires in 30 minutes):',
-        resetUrl,
-        '',
-        'If you did not request this, you can ignore this email.',
-      ].join('\n'),
-      html: buildPasswordResetHtml(resetUrl),
+      text: buildTextBody(input.resetUrl),
+      html: buildPasswordResetHtml(input.resetUrl),
     });
     logger.info(
       {
@@ -135,12 +181,37 @@ export async function sendPasswordResetEmail(input: { to: string; resetToken: st
         accepted: info.accepted,
         rejected: info.rejected,
         response: info.response,
+        provider: 'smtp',
         resetBase: resetBaseUrl(),
       },
       'Password reset email sent',
     );
   } catch (error) {
-    logger.error({ err: error, to: input.to, host: env.smtpHost, port: env.smtpPort }, 'Failed to send password reset email');
-    throw new ApiError(503, 'Unable to send password reset email right now');
+    logger.error(
+      { err: error, to: input.to, host: env.smtpHost, port: env.smtpPort },
+      'Failed to send password reset email via SMTP',
+    );
+    throw new ApiError(
+      503,
+      env.isProduction
+        ? 'Unable to send password reset email right now. Render free tier blocks SMTP — set RESEND_API_KEY or upgrade the instance.'
+        : 'Unable to send password reset email right now',
+    );
   }
+}
+
+export async function sendPasswordResetEmail(input: { to: string; resetToken: string }) {
+  if (!isEmailConfigured()) {
+    throw new ApiError(503, 'Email delivery is not configured');
+  }
+
+  const resetUrl = `${resetBaseUrl()}/forgot-password?token=${encodeURIComponent(input.resetToken)}`;
+
+  // Prefer Resend (HTTPS) — required on Render free tier where SMTP ports are blocked.
+  if (env.resendApiKey) {
+    await sendViaResend({ to: input.to, resetUrl });
+    return;
+  }
+
+  await sendViaSmtp({ to: input.to, resetUrl });
 }

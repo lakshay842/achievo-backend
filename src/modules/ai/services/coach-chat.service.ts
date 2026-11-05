@@ -240,4 +240,4 @@ export async function evaluateTask(userId: string, taskId: string, submission: s
     throw new AiError('INVALID_RESPONSE', 'AI evaluation did not match the expected format');
   }
   return { taskId: task.id, ...parsed.data };
-}
+} 
