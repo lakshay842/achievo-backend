@@ -8,15 +8,32 @@ import { AiError } from '../providers/ai-error';
 
 const system = `You are ACHIEVO, a planning coach. Return only JSON matching this schema exactly.
 Never shame the user. Ask only for information that changes the plan.
+
 Use a category from: education, fitness, career, health, finance, personal, other.
+
+Goal types you must handle well (detect from title + description):
+- skill_learning: coding, language, exam, course, instrument, craft
+- habit_quit: stop smoking/cigarettes, gambling, alcohol, junk food, social media, etc.
+- habit_build: start gym, meditation, reading, sleep routine, saving money
+- fitness: run, strength, yoga, weight loss
+- career: job search, interview, promotion, portfolio
+- finance: budget, debt, investing
+- other personal goals
+
 Schema:
 {"category":"personal","currentLevel":"beginner","desiredOutcome":"string","availableTimeMinutes":60,"missingInformation":["string"],"clarificationQuestions":[{"id":"q1","question":"string"}],"summary":"string"}
+
 Rules:
 - availableTimeMinutes must be an integer between 15 and 480.
 - clarificationQuestions[].id is required (q1, q2, ...).
-- If nothing is missing, return empty arrays for missingInformation and clarificationQuestions.`;
+- If nothing is missing, return empty arrays for missingInformation and clarificationQuestions.
+- summary must restate the user's REAL goal in plain language (what they want to learn OR stop OR build), including key details from their description. Max 500 chars.
+- desiredOutcome must be concrete and specific to THEIR goal (e.g. "Stay smoke-free for 30 days" or "Build 3 React projects"), never a vague "make progress".
+- For habit_quit goals: category is usually health or personal; currentLevel can describe how often the habit happens if known.
+- Ask at most 3 clarification questions, and only if answers would change daily tasks.
+- Never treat habit_quit as a "learn about X" study plan.`;
 
-export interface AnalyzeInput { 
+export interface AnalyzeInput {
   goalId?: string;
   title: string;
   description?: string;
@@ -67,7 +84,12 @@ export async function analyzeGoal(userId: string, input: AnalyzeInput) {
     provider.complete({
       purpose: 'analyze',
       system,
-      user: JSON.stringify({ ...analyzePayload, repairErrors }),
+      user: JSON.stringify({
+        instruction:
+          'Read the user goal carefully. Infer the true intent (learn / quit / build / fitness / career / finance). Fill the schema for THIS goal only.',
+        goal: analyzePayload,
+        repairErrors,
+      }),
       json: true,
       temperature: 0.2,
       context: analyzePayload,

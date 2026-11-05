@@ -52,15 +52,13 @@ async function main() {
     ),
   );
 
-  // Prefer stable flash aliases first. Avoid gemini-flash-latest — it often hangs.
+  // Prefer lite/flash first for latency. Avoid gemini-flash-latest — it often hangs.
   const models = Array.from(
     new Set([
       env.geminiModel,
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
       'gemini-flash-lite-latest',
-      'gemini-3-flash-preview',
-      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-3.5-flash',
     ]),
   );
 

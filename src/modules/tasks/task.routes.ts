@@ -41,7 +41,10 @@ const rescheduleSchema = z.object({
 const feedbackSchema = z.object({
   body: z.object({
     difficulty: z.enum(['easy', 'moderate', 'hard']),
-    note: z.string().trim().max(1000).optional(),
+    note: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.string().trim().max(1000).optional(),
+    ),
   }),
   query: emptyObject,
   params: z.object({ id: objectIdSchema }),

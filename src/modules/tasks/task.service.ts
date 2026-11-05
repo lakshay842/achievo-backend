@@ -167,11 +167,28 @@ export async function saveFeedback(
   input: { difficulty: 'easy' | 'moderate' | 'hard'; note?: string },
 ) {
   const task = await requireOwnedTask(userId, taskId);
+  if (task.status !== 'completed') {
+    throw new ApiError(409, 'Complete the task before saving difficulty feedback');
+  }
+
+  const note = input.note?.trim() ?? '';
   task.difficultyFeedback = input.difficulty;
-  task.feedbackNote = input.note;
+  task.feedbackNote = note || undefined;
+  task.markModified('difficultyFeedback');
+  task.markModified('feedbackNote');
   await task.save();
-  await recordProgress(userId, task, 'feedback', { difficulty: input.difficulty });
-  return toTaskDto(task);
+
+  try {
+    await recordProgress(userId, task, 'feedback', {
+      difficulty: input.difficulty,
+      note: note || undefined,
+    });
+  } catch {
+    // Feedback on the task is already saved; progress log is best-effort.
+  }
+
+  const fresh = await TaskModel.findById(task._id);
+  return toTaskDto(fresh ?? task);
 }
 
 export async function requireOwnedTask(userId: string, taskId: string) {

@@ -46,7 +46,14 @@ function isAllowedOrigin(origin: string) {
 export const app = express();
 
 app.set('trust proxy', env.isProduction ? 1 : false);
+app.set('etag', false);
 app.disable('x-powered-by');
+
+app.use((_req, res, next) => {
+  // Avoid browser 304 caches returning stale tasks/goals after mutations.
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 app.use(
   helmet({

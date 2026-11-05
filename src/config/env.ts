@@ -18,14 +18,20 @@ const schema = z
     GEMINI_FALLBACK_MODELS: z
       .string()
       .optional()
-      .default('gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-2.5-flash'),
+      .default('gemini-2.5-flash'),
     MOCK_AI: z.enum(['true', 'false']),
     AI_FALLBACK_TO_MOCK: z.enum(['true', 'false']).optional().default('true'),
     FRONTEND_ORIGIN: z.string().min(1),
-    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
-    AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).optional().default(2),
+    AI_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+    AI_MAX_RETRIES: z.coerce.number().int().min(0).max(5).optional().default(1),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'silent']).default('info'),
     NOTIFICATIONS_DRY_RUN: z.enum(['true', 'false']).optional(),
+    SMTP_HOST: z.string().optional().default('smtp.gmail.com'),
+    SMTP_PORT: z.coerce.number().int().positive().optional().default(587),
+    SMTP_USER: z.string().optional().default(''),
+    SMTP_PASS: z.string().optional().default(''),
+    SMTP_FROM: z.string().optional().default(''),
+    PASSWORD_RESET_URL_BASE: z.string().optional().default(''),
   })
   .superRefine((value, ctx) => {
     if (value.MOCK_AI === 'false' && value.GEMINI_API_KEY.trim().length < 10) {
@@ -70,6 +76,12 @@ export const env = {
   notificationsDryRun: raw.NOTIFICATIONS_DRY_RUN
     ? raw.NOTIFICATIONS_DRY_RUN === 'true'
     : raw.NODE_ENV !== 'production',
+  smtpHost: raw.SMTP_HOST.trim(),
+  smtpPort: raw.SMTP_PORT,
+  smtpUser: raw.SMTP_USER.trim(),
+  smtpPass: raw.SMTP_PASS,
+  smtpFrom: raw.SMTP_FROM.trim(),
+  passwordResetUrlBase: raw.PASSWORD_RESET_URL_BASE.trim(),
   isProduction: raw.NODE_ENV === 'production',
   isTest: raw.NODE_ENV === 'test',
 };

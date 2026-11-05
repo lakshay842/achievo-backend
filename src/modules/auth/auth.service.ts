@@ -8,6 +8,7 @@ import { UserPreferenceModel } from '../users/user-preference.model';
 import { UserStreakModel } from '../progress/streak.model';
 import { toPublicUser } from '../users/user.service';
 import { LoginInput, RegisterInput } from './auth.validation';
+import { isSmtpConfigured, sendPasswordResetEmail } from './mail.service';
 
 const RESET_WINDOW_MS = 30 * 60 * 1000;
 
@@ -108,16 +109,27 @@ export async function me(userId: string) {
 export async function forgotPassword(email: string) {
   const user = await UserModel.findOne({ email }).select('+passwordResetTokenHash +passwordResetExpiresAt');
   if (!user) {
+    // Same shape whether or not the account exists.
     return { delivered: true as const };
   }
+
   const resetToken = randomToken(32);
   user.passwordResetTokenHash = sha256(resetToken);
   user.passwordResetExpiresAt = new Date(Date.now() + RESET_WINDOW_MS);
   await user.save();
-  return {
-    delivered: true as const,
-    ...(env.isProduction ? {} : { resetToken }),
-  };
+
+  // Never expose the raw token to the client outside automated tests.
+  // Real apps must open the emailed link (or fail if SMTP is missing).
+  if (env.isTest) {
+    return { delivered: true as const, emailed: false as const, resetToken };
+  }
+
+  if (!isSmtpConfigured()) {
+    throw new ApiError(503, 'Password reset email is not configured on the server');
+  }
+
+  await sendPasswordResetEmail({ to: user.email, resetToken });
+  return { delivered: true as const, emailed: true as const };
 }
 
 export async function resetPassword(token: string, password: string) {

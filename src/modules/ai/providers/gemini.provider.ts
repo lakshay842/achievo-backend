@@ -13,6 +13,33 @@ function modelCandidates(): string[] {
   return Array.from(new Set([env.geminiModel, ...env.geminiFallbackModels].filter(Boolean)));
 }
 
+/** Keep generation short where UX needs speed; roadmaps still need headroom. */
+function maxOutputTokensFor(purpose: AiCompletionRequest['purpose']): number {
+  switch (purpose) {
+    case 'roadmap':
+    case 'replan':
+      return 16384;
+    case 'analyze':
+    case 'clarify':
+    case 'evaluate':
+      return 3072;
+    case 'chat':
+    case 'explain':
+    default:
+      return 2048;
+  }
+}
+
+function timeoutMsFor(purpose: AiCompletionRequest['purpose']): number {
+  if (purpose === 'roadmap' || purpose === 'replan') {
+    return Math.max(env.aiTimeoutMs, 45_000);
+  }
+  if (purpose === 'analyze' || purpose === 'clarify') {
+    return Math.max(env.aiTimeoutMs, 30_000);
+  }
+  return env.aiTimeoutMs;
+}
+
 export class GeminiProvider implements AiProvider {
   readonly name = 'gemini' as const;
 
@@ -108,9 +135,9 @@ export class GeminiProvider implements AiProvider {
         config: {
           systemInstruction: request.system,
           temperature: request.temperature ?? 0.4,
-          maxOutputTokens: request.purpose === 'roadmap' || request.purpose === 'replan' ? 8192 : 4096,
+          maxOutputTokens: maxOutputTokensFor(request.purpose),
           responseMimeType: request.json ? 'application/json' : 'text/plain',
-          abortSignal: AbortSignal.timeout(env.aiTimeoutMs),
+          abortSignal: AbortSignal.timeout(timeoutMsFor(request.purpose)),
         },
       });
 
