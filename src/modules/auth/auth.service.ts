@@ -129,12 +129,15 @@ export async function forgotPassword(email: string) {
     throw new ApiError(503, 'Password reset email is not configured on the server');
   }
 
-  // Send in the background so Render cold starts + slow Gmail SMTP do not
-  // block the HTTP response past the app's client timeout.
-  void sendPasswordResetEmail({ to: user.email, resetToken }).catch((error) => {
-    // Token is already saved; user can request another email if delivery fails.
-    logger.error({ err: error, email: user.email }, 'Background password reset email failed');
-  });
+  // Await real delivery. Do not return "emailed: true" if SMTP fails on Render.
+  // Client timeout for this route is 60s to allow cold start + send.
+  try {
+    await sendPasswordResetEmail({ to: user.email, resetToken });
+  } catch (error) {
+    logger.error({ err: error, email: user.email }, 'Password reset email failed');
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(503, 'Unable to send password reset email right now');
+  }
 
   return { delivered: true as const, emailed: true as const };
 }

@@ -1,7 +1,11 @@
+import dns from 'dns';
 import nodemailer from 'nodemailer';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { ApiError } from '../../utils/ApiError';
+
+// Prefer IPv4 — some hosts (incl. Render) have flaky IPv6 to smtp.gmail.com.
+dns.setDefaultResultOrder('ipv4first');
 
 export function isSmtpConfigured(): boolean {
   return Boolean(env.smtpUser && env.smtpPass);
@@ -25,10 +29,9 @@ function createTransport() {
       user: env.smtpUser,
       pass: env.smtpPass,
     },
-    // Prevent forgot-password HTTP requests from hanging until the mobile client times out.
-    connectionTimeout: 12_000,
-    greetingTimeout: 12_000,
-    socketTimeout: 20_000,
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 25_000,
   });
 }
 
@@ -110,7 +113,7 @@ export async function sendPasswordResetEmail(input: { to: string; resetToken: st
   const transport = createTransport();
 
   try {
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from,
       to: input.to,
       subject: 'Reset your Achievo password',
@@ -125,9 +128,19 @@ export async function sendPasswordResetEmail(input: { to: string; resetToken: st
       ].join('\n'),
       html: buildPasswordResetHtml(resetUrl),
     });
-    logger.info({ to: input.to }, 'Password reset email sent');
+    logger.info(
+      {
+        to: input.to,
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+        resetBase: resetBaseUrl(),
+      },
+      'Password reset email sent',
+    );
   } catch (error) {
-    logger.error({ err: error, to: input.to }, 'Failed to send password reset email');
+    logger.error({ err: error, to: input.to, host: env.smtpHost, port: env.smtpPort }, 'Failed to send password reset email');
     throw new ApiError(503, 'Unable to send password reset email right now');
   }
 }

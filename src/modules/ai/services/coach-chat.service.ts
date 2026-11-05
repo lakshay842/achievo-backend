@@ -16,7 +16,9 @@ Your job: keep learning + habit change in ONE place — clear next actions, prac
 How to answer:
 - Be accurate, practical, and specific. Prefer a concrete next step they can do in the next 10–30 minutes.
 - If they ask a factual or how-to question (coding, study topic, quitting a habit, etc.), give a correct useful answer first, then one Achievo-style next action.
-- Language (strict): follow replyLanguage in the request. en = clear English only. hi = natural Hindi/Hinglish. Match the LATEST user message, not older chat history. Default to English when unsure.
+- Language (STRICT — never ignore replyLanguage):
+  - replyLanguage=en → write entirely in clear English.
+  - replyLanguage=hi → write in natural Hindi/Hinglish (Roman script is OK if the user wrote Roman Hindi, e.g. "Mujhe Java samjhao"). Do NOT reply in English when replyLanguage is hi.
 - Keep replies clear: usually 2–6 short sentences. Use plain numbered steps 1. 2. 3. when helpful.
 - Never shame the user. Never invent that you checked the internet. Never claim medical/legal authority; for addiction/health, stay supportive and practical.
 - Use their active goals/tasks from context when relevant. If context is empty, still help with a clear plan.
@@ -32,32 +34,28 @@ Reply shape (always):
    Cover: what to do step-by-step, what “done” looks like, a common mistake to avoid, and the first 5-minute start.
 3) Optional one-line closer with encouragement.
 
-Language (strict): follow replyLanguage. If replyLanguage is en, write entirely in clear English — no Hindi/Hinglish. Only use Hindi/Hinglish when replyLanguage is hi.
+Language (STRICT): follow replyLanguage. en = English only. hi = Hindi/Hinglish only (Roman OK).
 No markdown headings, bold, tables, or code fences. Bullets with "- " are required and encouraged.
 Never shame the user. Be specific to THIS task title and instructions — do not give generic filler.`;
+
+const HINGLISH_WORD =
+  /\b(hai|hain|hoon|hun|kya|kaise|kyun|kyu|kyu[n]?|mujhe|mujhko|mera|meri|mere|hum|aap|tum|seekhna|seekhni|seekho|seekh|padhna|padho|padh|chodna|chodo|karna|karo|karke|batao|bataana|bata|samjhao|samjha|samajh|nahi|nahin|mat|kripya|madad|chahiye|chahie|aaj|kal|abhi|thoda|zyada|accha|acha|theek|namaste|bhai|yaar|kaam|shuru|shuruat|dikhao|do|dena|dijiye|please\s+batao)\b/i;
 
 function detectReplyLanguage(text: string): 'en' | 'hi' {
   const value = text.trim();
   if (!value) return 'en';
 
   const hindiChars = (value.match(/[\u0900-\u097F]/g) ?? []).length;
-  const latinChars = (value.match(/[A-Za-z]/g) ?? []).length;
-
-  // Devanagari-heavy → Hindi
-  if (hindiChars >= 6 && hindiChars >= latinChars * 0.35) {
+  if (hindiChars >= 2) {
     return 'hi';
   }
 
-  // Mostly Latin letters → English (English task copy, English chat)
-  if (latinChars >= 8 && latinChars > hindiChars * 2) {
-    return 'en';
-  }
+  const hinglishHits = value.match(
+    new RegExp(HINGLISH_WORD.source, 'gi'),
+  ) ?? [];
 
-  const hinglishHits =
-    value.match(
-      /\b(hai|hain|kya|kaise|mujhe|mera|meri|seekhna|seekh|padhna|padh|chodna|karna|batao|samjhao|nahi|kripya)\b/gi,
-    ) ?? [];
-  if (hinglishHits.length >= 2 && latinChars < 50) {
+  // Roman Hindi / Hinglish: even one clear cue is enough ("Mujhe Java samjhao", "kya hai").
+  if (hinglishHits.length >= 1) {
     return 'hi';
   }
 
@@ -145,7 +143,7 @@ export async function chatWithCoach(
         instruction:
           replyLanguage === 'en'
             ? 'Answer in clear English only. Tie advice to their goals/tasks when useful.'
-            : 'Answer in natural Hindi/Hinglish. Tie advice to their goals/tasks when useful.',
+            : 'IMPORTANT: replyLanguage=hi. Write the FULL reply in natural Hindi/Hinglish (Roman script OK, jaise user ne likha). Do not answer in English.',
         replyLanguage,
         history: history.map((item) => ({ role: item.role, content: item.content })),
         message: input.message,

@@ -62,14 +62,21 @@ export class MockAiProvider implements AiProvider {
   }
 }
 
-function looksHindi(text: string) {
-  return /[\u0900-\u097F]/.test(text) || /\b(hai|hain|kya|kaise|mujhe|mera|seekh|padh|chod|karna|batao|samjhao)\b/i.test(text);
+function looksHindi(text: string, replyLanguage?: unknown) {
+  if (replyLanguage === 'hi') return true;
+  if (replyLanguage === 'en') return false;
+  return (
+    /[\u0900-\u097F]/.test(text) ||
+    /\b(hai|hain|kya|kaise|mujhe|mera|meri|seekh|padh|chod|karna|karo|batao|samjhao|chahiye|aaj|madad|namaste)\b/i.test(
+      text,
+    )
+  );
 }
 
 function buildChatReply(context: Record<string, unknown>) {
   const message = String(context.message ?? '').trim();
   const lower = message.toLowerCase();
-  const hindi = looksHindi(message);
+  const hindi = looksHindi(message, context.replyLanguage);
 
   if (!message) {
     return hindi
