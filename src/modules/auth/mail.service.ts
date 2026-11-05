@@ -149,6 +149,13 @@ async function sendViaResend(input: { to: string; resetUrl: string }) {
       { status: response.status, payload, to: input.to },
       'Resend password reset email failed',
     );
+    const hint = String(payload.message ?? '');
+    if (/verify a domain|own email address/i.test(hint)) {
+      throw new ApiError(
+        503,
+        'Resend is in test mode: it can only email your Resend account address until you verify a domain (resend.com/domains).',
+      );
+    }
     throw new ApiError(503, 'Unable to send password reset email right now');
   }
 

@@ -18,7 +18,7 @@ How to answer:
 - If they ask a factual or how-to question (coding, study topic, quitting a habit, etc.), give a correct useful answer first, then one Achievo-style next action.
 - Language (STRICT — never ignore replyLanguage):
   - replyLanguage=en → write entirely in clear English.
-  - replyLanguage=hi → write in natural Hindi/Hinglish (Roman script is OK if the user wrote Roman Hindi, e.g. "Mujhe Java samjhao"). Do NOT reply in English when replyLanguage is hi.
+  - replyLanguage=hi → write the FULL reply in natural Hindi/Hinglish (Roman script OK). Never say you are in "English mode". Never answer in English when replyLanguage is hi, even if earlier chat was English.
 - Keep replies clear: usually 2–6 short sentences. Use plain numbered steps 1. 2. 3. when helpful.
 - Never shame the user. Never invent that you checked the internet. Never claim medical/legal authority; for addiction/health, stay supportive and practical.
 - Use their active goals/tasks from context when relevant. If context is empty, still help with a clear plan.
@@ -39,23 +39,42 @@ No markdown headings, bold, tables, or code fences. Bullets with "- " are requir
 Never shame the user. Be specific to THIS task title and instructions — do not give generic filler.`;
 
 const HINGLISH_WORD =
-  /\b(hai|hain|hoon|hun|kya|kaise|kyun|kyu|kyu[n]?|mujhe|mujhko|mera|meri|mere|hum|aap|tum|seekhna|seekhni|seekho|seekh|padhna|padho|padh|chodna|chodo|karna|karo|karke|batao|bataana|bata|samjhao|samjha|samajh|nahi|nahin|mat|kripya|madad|chahiye|chahie|aaj|kal|abhi|thoda|zyada|accha|acha|theek|namaste|bhai|yaar|kaam|shuru|shuruat|dikhao|do|dena|dijiye|please\s+batao)\b/i;
+  /\b(hai|hain|hoon|hun|kya|kaise|kyun|kyu|mujhe|mujhko|mera|meri|mere|hum|aap|tum|seekhna|seekhni|seekho|seekh|padhna|padho|padh|chodna|chodo|karna|karo|karke|batao|btao|bataana|bata|samjhao|samjha|samajh|nahi|nahin|mat|kripya|madad|chahiye|chahie|aaj|kal|abhi|thoda|zyada|accha|acha|theek|namaste|bhai|yaar|kaam|shuru|shuruat|dikhao|dena|dijiye|bolo|bolna|samjhao)\b/i;
 
-function detectReplyLanguage(text: string): 'en' | 'hi' {
+function wantsEnglish(text: string): boolean {
+  return /\b(in\s+english|english\s+(me|mein|mai|language)|reply\s+in\s+english|answer\s+in\s+english)\b/i.test(
+    text,
+  );
+}
+
+function wantsHindi(text: string): boolean {
+  if (/[\u0900-\u097F]{2,}/.test(text)) return true;
+  if (
+    /\b(in\s+hindi|hindi\s+(me|mein|mai|language)|hinglish|hindi\s+me\s+b(a)?tao|hindi\s+me\s+samjhao|reply\s+in\s+hindi|answer\s+in\s+hindi)\b/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  if (/\bhindi\b/i.test(text) && /\b(me|mein|mai|btao|batao|samjhao|bolo|explain|bata)\b/i.test(text)) {
+    return true;
+  }
+  return HINGLISH_WORD.test(text);
+}
+
+function detectReplyLanguage(
+  text: string,
+  history: Array<{ role: string; content: string }> = [],
+): 'en' | 'hi' {
   const value = text.trim();
   if (!value) return 'en';
 
-  const hindiChars = (value.match(/[\u0900-\u097F]/g) ?? []).length;
-  if (hindiChars >= 2) {
-    return 'hi';
-  }
+  if (wantsEnglish(value)) return 'en';
+  if (wantsHindi(value)) return 'hi';
 
-  const hinglishHits = value.match(
-    new RegExp(HINGLISH_WORD.source, 'gi'),
-  ) ?? [];
-
-  // Roman Hindi / Hinglish: even one clear cue is enough ("Mujhe Java samjhao", "kya hai").
-  if (hinglishHits.length >= 1) {
+  // Keep Hindi for the rest of the chat after the user asked for it.
+  const recentUser = history.filter((item) => item.role === 'user').slice(-6);
+  if (recentUser.some((item) => wantsHindi(item.content)) && !wantsEnglish(value)) {
     return 'hi';
   }
 
@@ -132,7 +151,8 @@ export async function chatWithCoach(
 
   const history = (conversation?.messages ?? []).slice(-11, -1);
   const context = await coachContext(userId, input.goalId);
-  const replyLanguage = detectReplyLanguage(input.message);
+  const historyForLang = history.map((item) => ({ role: item.role, content: item.content }));
+  const replyLanguage = detectReplyLanguage(input.message, historyForLang);
 
   const provider = getAiProvider();
   const reply = toPlainText(
@@ -143,9 +163,9 @@ export async function chatWithCoach(
         instruction:
           replyLanguage === 'en'
             ? 'Answer in clear English only. Tie advice to their goals/tasks when useful.'
-            : 'IMPORTANT: replyLanguage=hi. Write the FULL reply in natural Hindi/Hinglish (Roman script OK, jaise user ne likha). Do not answer in English.',
+            : 'CRITICAL: replyLanguage=hi. User asked for Hindi. Reply FULLY in Hindi/Hinglish (Roman OK). Do not say English mode. Do not use English paragraphs.',
         replyLanguage,
-        history: history.map((item) => ({ role: item.role, content: item.content })),
+        history: historyForLang,
         message: input.message,
         userContext: context,
       }),
